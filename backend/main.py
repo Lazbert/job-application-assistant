@@ -12,5 +12,5 @@ def init_driver() -> webdriver.Chrome:
 
 
 # %%
-manager = JobBoardAutomationManager(driver=init_driver())
+manager = JobBoardAutomationManager(driver=init_driver(), filter="IT/")
 manager.execute()

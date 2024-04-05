@@ -1,8 +1,9 @@
+import os
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
-import os
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.keys import Keys
 from abc import ABC, abstractmethod
 from dotenv import load_dotenv
 
@@ -35,11 +36,12 @@ class JobBoardAutomationManager(AutomationManager):
     MSFT_LOGIN_TITLE = "Sign in to your account"
     DUO_TITLE = "Duo Security"
 
-    def __init__(self, driver: webdriver.Chrome):
+    def __init__(self, driver: webdriver.Chrome, filter: str):
         super().__init__(driver)
         self._job_board_url = os.getenv("JOB_BOARD_URL")
         self._email = os.getenv("EMAIL")
         self._password = os.getenv("PASSWORD")
+        self.filter = filter
 
     @property
     def job_board_url(self):
@@ -118,7 +120,29 @@ class JobBoardAutomationManager(AutomationManager):
         disclaimer_agree_btn.click()
         return self
 
+    # TODO: Implement multi-filter
     def apply_filters(self):
+        # select filter from dropdown
+        job_nature_filter = self.wait.until(
+            EC.element_to_be_clickable(
+                (By.XPATH, r'//span[starts-with(@class,"select2-selection")]')
+            )
+        )
+        job_nature_filter.click()
+        job_nature_input = self.wait.until(
+            EC.element_to_be_clickable(
+                (By.XPATH, r'//input[@placeholder="All Job Natures"]')
+            )
+        )
+        job_nature_input.send_keys(self.filter)
+        job_nature_input.send_keys(Keys.ENTER)
+
+        # search with filter
+        search_btn = self.wait.until(
+            EC.element_to_be_clickable((By.XPATH, r'//button[@type="submit"]'))
+        )
+        search_btn.click()
+        print(f"Applied filters: {self.filter}")
         return self
 
     def get_job_listings(self):
