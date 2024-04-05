@@ -22,7 +22,7 @@ from abc import ABC, abstractmethod
 
 
 class AutomationManager(ABC):
-    TIMEOUT = 3
+    TIMEOUT = 5
 
     def __init__(self, driver: webdriver.Chrome):
         self.driver = driver
@@ -43,47 +43,91 @@ class AutomationManager(ABC):
         raise NotImplementedError
 
 
-class USTJobBoardAutomationManager(AutomationManager):
+class JobBoardAutomationManager(AutomationManager):
     MSFT_LOGIN_TITLE = "Sign in to your account"
+    DUO_TITLE = "Duo Security"
 
     def __init__(self, driver: webdriver.Chrome):
         super().__init__(driver)
-        self._job_board_url = os.getenv("HKUST_JOB_BOARD_URL")
-        self._hkust_email = os.getenv("HKUST_EMAIL")
-        self._hkust_password = os.getenv("HKUST_PASSWORD")
+        self._job_board_url = os.getenv("JOB_BOARD_URL")
+        self._email = os.getenv("EMAIL")
+        self._password = os.getenv("PASSWORD")
 
     @property
     def job_board_url(self):
         if not self._job_board_url:
             raise ValueError(
-                "Unable to retrieve url for HKUST Job Board. Please check environment variables."
+                "Unable to retrieve url for job board. Please check environment variables."
             )
         return self._job_board_url
 
     @property
-    def hkust_email(self):
-        if not self._hkust_email:
+    def email(self):
+        if not self._email:
             raise ValueError(
-                "Unable to retrieve HKUST email. Please check environment variables."
+                "Unable to retrieve email. Please check environment variables."
             )
-        return self._hkust_email
+        return self._email
 
     @property
-    def hkust_password(self):
-        if not self._hkust_password:
+    def password(self):
+        if not self._password:
             raise ValueError(
-                "Unable to retrieve HKUST password. Please check environment variables."
+                "Unable to retrieve password. Please check environment variables."
             )
-        return self._hkust_password
+        return self._password
 
     def execute(self):
         super().execute()
-        self.driver.implicitly_wait(self.TIMEOUT)
         if self.driver.title == self.MSFT_LOGIN_TITLE:
             self.handle_auth()
-        self.apply_filters().get_job_listings()
+        self.agree_terms().apply_filters().get_job_listings()
 
     def handle_auth(self):
+        # enter email and click next
+        email_input = self.wait.until(
+            EC.presence_of_element_located((By.NAME, "loginfmt"))
+        )
+        email_input.send_keys(self.email)
+        next_btn = self.wait.until(EC.element_to_be_clickable((By.ID, "idSIButton9")))
+        next_btn.click()
+
+        # enter password and click sign in
+        password_input = self.wait.until(
+            EC.presence_of_element_located((By.ID, "i0118"))
+        )
+        password_input.send_keys(self.password)
+        sign_in_btn = self.wait.until(
+            EC.element_to_be_clickable((By.XPATH, r'//input[@type="submit"]'))
+        )
+        sign_in_btn.click()
+
+        # Duo Mobile
+        print("Waiting approval from mobile device...")
+        my_device_btn = WebDriverWait(self.driver, 60).until(
+            EC.element_to_be_clickable((By.ID, "trust-browser-button"))
+        )
+        print("\u2713 Received approval from mobile device")
+        my_device_btn.click()
+
+        return self
+
+    def agree_terms(self):
+        # agree the declaration form
+        declaration_checkbox = self.wait.until(
+            EC.element_to_be_clickable((By.XPATH, r'//input[@type="checkbox"]'))
+        )
+        declaration_checkbox.click()
+        agree_btn = self.wait.until(
+            EC.element_to_be_clickable((By.XPATH, r'//input[@value="Agree"]'))
+        )
+        agree_btn.click()
+
+        # agree disclaimer
+        disclaimer_agree_btn = self.wait.until(
+            EC.element_to_be_clickable((By.XPATH, r'//input[@type="submit"]'))
+        )
+        disclaimer_agree_btn.click()
         return self
 
     def apply_filters(self):
@@ -93,5 +137,5 @@ class USTJobBoardAutomationManager(AutomationManager):
         return self
 
 
-manager = USTJobBoardAutomationManager(driver=init_driver())
+manager = JobBoardAutomationManager(driver=init_driver())
 manager.execute()
