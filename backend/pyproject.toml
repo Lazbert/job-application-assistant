@@ -9,6 +9,9 @@ readme = "README.md"
 python = "^3.12"
 selenium = "^4.19.0"
 pydantic = "^2.6.4"
+chromedriver-py = "123.0.6312.105"
+ipykernel = "^6.29.4"
+python-dotenv = "^1.0.1"
 
 
 [build-system]
