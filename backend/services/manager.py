@@ -120,6 +120,7 @@ class JobBoardAutomationManager(AutomationManager):
         disclaimer_agree_btn.click()
         return self
 
+    # TODO: Implement multi-filter
     def apply_filters(self):
         # select filter from dropdown
         job_nature_filter = self.wait.until(
