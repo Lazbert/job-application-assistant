@@ -8,12 +8,10 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
-from dotenv import load_dotenv
-
-load_dotenv(os.path.join(os.getcwd(), ".env"))
 
 from interfaces.manager import AutomationManager
 from interfaces.job import JobOpening, JobSummary
+from services.utils.auth import JobBoardAuthenticationHandler
 
 
 class JobBoardAutomationManager(AutomationManager):
@@ -24,8 +22,7 @@ class JobBoardAutomationManager(AutomationManager):
     def __init__(self, driver: webdriver.Chrome, filter: str):
         super().__init__(driver)
         self._job_board_url = os.getenv("JOB_BOARD_URL")
-        self._email = os.getenv("EMAIL")
-        self._password = os.getenv("PASSWORD")
+        self.auth_handler = JobBoardAuthenticationHandler()
         self.filter = filter
 
     @property
@@ -36,22 +33,6 @@ class JobBoardAutomationManager(AutomationManager):
             )
         return self._job_board_url
 
-    @property
-    def email(self) -> str:
-        if not self._email:
-            raise ValueError(
-                "Unable to retrieve email. Please check environment variables."
-            )
-        return self._email
-
-    @property
-    def password(self) -> str:
-        if not self._password:
-            raise ValueError(
-                "Unable to retrieve password. Please check environment variables."
-            )
-        return self._password
-
     def execute(self):
         super().execute()
         if self.driver.title == self.MSFT_LOGIN_TITLE:
@@ -59,32 +40,7 @@ class JobBoardAutomationManager(AutomationManager):
         return self.agree_terms().apply_filters().get_job_listings()
 
     def handle_auth(self):
-        # enter email and click next
-        email_input = self.wait.until(
-            EC.presence_of_element_located((By.NAME, "loginfmt"))
-        )
-        email_input.send_keys(self.email)
-        next_btn = self.wait.until(EC.element_to_be_clickable((By.ID, "idSIButton9")))
-        next_btn.click()
-
-        # enter password and click sign in
-        password_input = self.wait.until(
-            EC.presence_of_element_located((By.ID, "i0118"))
-        )
-        password_input.send_keys(self.password)
-        sign_in_btn = self.wait.until(
-            EC.element_to_be_clickable((By.XPATH, r'//input[@type="submit"]'))
-        )
-        sign_in_btn.click()
-
-        # Duo Mobile
-        print("Waiting approval from mobile device...")
-        my_device_btn = WebDriverWait(self.driver, 60).until(
-            EC.element_to_be_clickable((By.ID, "trust-browser-button"))
-        )
-        print("\u2713 Received approval from mobile device")
-        my_device_btn.click()
-
+        self.auth_handler.handle_auth(self.driver, self.wait)
         return self
 
     def agree_terms(self):
