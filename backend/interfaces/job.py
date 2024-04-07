@@ -15,12 +15,12 @@ class JobDetails(BaseModel):
     website: str
     company_description: str
     job_description: str
-    other_requirements: Optional[str]
-    salary: Optional[int]
-    start_date: Optional[datetime]
-    end_date: Optional[datetime]
+    other_requirements: Optional[str] = None
+    salary: Optional[int] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
 
 
 class JobOpening(BaseModel):
     summary: JobSummary
-    details: JobDetails
+    details: Optional[JobDetails] = None
