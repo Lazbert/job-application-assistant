@@ -4,32 +4,11 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
-from abc import ABC, abstractmethod
 from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.getcwd(), ".env"))
 
-
-class AutomationManager(ABC):
-    TIMEOUT = 5
-
-    def __init__(self, driver: webdriver.Chrome):
-        self.driver = driver
-        self.wait = WebDriverWait(self.driver, self.TIMEOUT)
-
-    @property
-    @abstractmethod
-    def job_board_url(self):
-        raise NotImplementedError
-
-    @abstractmethod
-    def execute(self):
-        self.driver.get(self.job_board_url)
-        print(f"Title: {self.driver.title}")
-
-    @abstractmethod
-    def get_job_listings(self):
-        raise NotImplementedError
+from interfaces.manager import AutomationManager
 
 
 class JobBoardAutomationManager(AutomationManager):
