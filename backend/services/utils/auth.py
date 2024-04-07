@@ -11,7 +11,7 @@ load_dotenv()
 
 class AuthenticationHandler(ABC):
     @abstractmethod
-    def handle_auth(self, driver: webdriver.Chrome, email: str, password: str):
+    def handle_auth(self, driver: webdriver.Chrome, wait: WebDriverWait):
         raise NotImplementedError
 
 
@@ -46,6 +46,7 @@ class JobBoardAuthenticationHandler(AuthenticationHandler):
         # enter password and click sign in
         password_input = wait.until(EC.presence_of_element_located((By.ID, "i0118")))
         password_input.send_keys(self.password)
+
         sign_in_btn = wait.until(
             EC.element_to_be_clickable((By.XPATH, r'//input[@type="submit"]'))
         )

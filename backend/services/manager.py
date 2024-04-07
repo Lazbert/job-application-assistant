@@ -12,6 +12,7 @@ from selenium.webdriver.common.keys import Keys
 from interfaces.manager import AutomationManager
 from interfaces.job import JobOpening, JobSummary
 from services.utils.auth import JobBoardAuthenticationHandler
+from services.utils.terms import JobBoardTermsAgreementHandler
 
 
 class JobBoardAutomationManager(AutomationManager):
@@ -23,6 +24,7 @@ class JobBoardAutomationManager(AutomationManager):
         super().__init__(driver)
         self._job_board_url = os.getenv("JOB_BOARD_URL")
         self.auth_handler = JobBoardAuthenticationHandler()
+        self.terms_handler = JobBoardTermsAgreementHandler()
         self.filter = filter
 
     @property
@@ -44,21 +46,7 @@ class JobBoardAutomationManager(AutomationManager):
         return self
 
     def agree_terms(self):
-        # agree the declaration form
-        declaration_checkbox = self.wait.until(
-            EC.element_to_be_clickable((By.XPATH, r'//input[@type="checkbox"]'))
-        )
-        declaration_checkbox.click()
-        agree_btn = self.wait.until(
-            EC.element_to_be_clickable((By.XPATH, r'//input[@value="Agree"]'))
-        )
-        agree_btn.click()
-
-        # agree disclaimer
-        disclaimer_agree_btn = self.wait.until(
-            EC.element_to_be_clickable((By.XPATH, r'//input[@type="submit"]'))
-        )
-        disclaimer_agree_btn.click()
+        self.terms_handler.handle_terms_agreement(self.wait)
         return self
 
     # TODO: Implement multi-filter
