@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
+from interfaces.job import JobOpening
 
 
 class AutomationManager(ABC):
@@ -16,7 +17,7 @@ class AutomationManager(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def execute(self):
+    def execute(self) -> list[JobOpening]:
         self.driver.get(self.job_board_url)
         print(f"Title: {self.driver.title}")
 

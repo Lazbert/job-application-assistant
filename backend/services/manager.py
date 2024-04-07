@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 import time
 import random
+from enum import Enum, auto
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -51,7 +52,7 @@ class JobBoardAutomationManager(AutomationManager):
             )
         return self._password
 
-    def execute(self) -> list[JobOpening]:
+    def execute(self):
         super().execute()
         if self.driver.title == self.MSFT_LOGIN_TITLE:
             self.handle_auth()
@@ -192,3 +193,20 @@ class JobBoardAutomationManager(AutomationManager):
             self.driver.get(base_url + f"&page={page + 1}")
             all_job_openings.extend(get_single_page_jobs(self.driver))
         return all_job_openings
+
+
+class JobWebsite(Enum):
+    JOB_BOARD = auto()
+
+
+class AutomationManagerFactory:
+    @staticmethod
+    def create_manager(
+        source: JobWebsite, driver: webdriver.Chrome, filter: str
+    ) -> AutomationManager:
+        products = {
+            JobWebsite.JOB_BOARD: JobBoardAutomationManager(driver, filter="IT/")
+        }
+        if source in products:
+            return products[source]
+        raise NotImplementedError(f"Unsupported source: {source}")

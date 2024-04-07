@@ -1,7 +1,7 @@
 # %%
 from selenium import webdriver
 from chromedriver_py import binary_path
-from services.manager import JobBoardAutomationManager
+from services.manager import AutomationManagerFactory, JobWebsite
 
 
 def init_driver() -> webdriver.Chrome:
@@ -12,11 +12,10 @@ def init_driver() -> webdriver.Chrome:
 
 
 # %%
-manager = JobBoardAutomationManager(driver=init_driver(), filter="IT/")
-manager.execute()
-
-# %%
-all_openings = manager.get_job_listings()
+manager = AutomationManagerFactory.create_manager(
+    source=JobWebsite.JOB_BOARD, driver=init_driver(), filter="IT/"
+)
+all_openings = manager.execute()
 
 # %%
 all_openings
