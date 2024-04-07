@@ -1,19 +1,17 @@
 import os
-from datetime import datetime
 import time
 import random
 from enum import Enum, auto
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
-from dotenv import load_dotenv
-
-load_dotenv(os.path.join(os.getcwd(), ".env"))
 
 from interfaces.manager import AutomationManager
-from interfaces.job import JobOpening, JobSummary
+from interfaces.job import JobOpening
+from services.utils.auth import JobBoardAuthenticationHandler
+from services.utils.terms import JobBoardTermsAgreementHandler
+from services.utils.parser import JobBoardSinglePageParser
 
 
 class JobBoardAutomationManager(AutomationManager):
@@ -24,8 +22,11 @@ class JobBoardAutomationManager(AutomationManager):
     def __init__(self, driver: webdriver.Chrome, filter: str):
         super().__init__(driver)
         self._job_board_url = os.getenv("JOB_BOARD_URL")
-        self._email = os.getenv("EMAIL")
-        self._password = os.getenv("PASSWORD")
+        self.auth_handler = JobBoardAuthenticationHandler(
+            driver=self.driver, wait=self.wait
+        )
+        self.terms_handler = JobBoardTermsAgreementHandler(wait=self.wait)
+        self.single_page_parser = JobBoardSinglePageParser(driver=self.driver)
         self.filter = filter
 
     @property
@@ -36,22 +37,6 @@ class JobBoardAutomationManager(AutomationManager):
             )
         return self._job_board_url
 
-    @property
-    def email(self) -> str:
-        if not self._email:
-            raise ValueError(
-                "Unable to retrieve email. Please check environment variables."
-            )
-        return self._email
-
-    @property
-    def password(self) -> str:
-        if not self._password:
-            raise ValueError(
-                "Unable to retrieve password. Please check environment variables."
-            )
-        return self._password
-
     def execute(self):
         super().execute()
         if self.driver.title == self.MSFT_LOGIN_TITLE:
@@ -59,50 +44,11 @@ class JobBoardAutomationManager(AutomationManager):
         return self.agree_terms().apply_filters().get_job_listings()
 
     def handle_auth(self):
-        # enter email and click next
-        email_input = self.wait.until(
-            EC.presence_of_element_located((By.NAME, "loginfmt"))
-        )
-        email_input.send_keys(self.email)
-        next_btn = self.wait.until(EC.element_to_be_clickable((By.ID, "idSIButton9")))
-        next_btn.click()
-
-        # enter password and click sign in
-        password_input = self.wait.until(
-            EC.presence_of_element_located((By.ID, "i0118"))
-        )
-        password_input.send_keys(self.password)
-        sign_in_btn = self.wait.until(
-            EC.element_to_be_clickable((By.XPATH, r'//input[@type="submit"]'))
-        )
-        sign_in_btn.click()
-
-        # Duo Mobile
-        print("Waiting approval from mobile device...")
-        my_device_btn = WebDriverWait(self.driver, 60).until(
-            EC.element_to_be_clickable((By.ID, "trust-browser-button"))
-        )
-        print("\u2713 Received approval from mobile device")
-        my_device_btn.click()
-
+        self.auth_handler.handle_auth()
         return self
 
     def agree_terms(self):
-        # agree the declaration form
-        declaration_checkbox = self.wait.until(
-            EC.element_to_be_clickable((By.XPATH, r'//input[@type="checkbox"]'))
-        )
-        declaration_checkbox.click()
-        agree_btn = self.wait.until(
-            EC.element_to_be_clickable((By.XPATH, r'//input[@value="Agree"]'))
-        )
-        agree_btn.click()
-
-        # agree disclaimer
-        disclaimer_agree_btn = self.wait.until(
-            EC.element_to_be_clickable((By.XPATH, r'//input[@type="submit"]'))
-        )
-        disclaimer_agree_btn.click()
+        self.terms_handler.handle_terms_agreement()
         return self
 
     # TODO: Implement multi-filter
@@ -134,64 +80,12 @@ class JobBoardAutomationManager(AutomationManager):
         # set results with descending deadline, i.e furthest deadline goes first
         base_url = self.driver.current_url + self.SORT_BY_DESC_DEADLINE
         self.driver.get(base_url)
-
-        def get_single_page_jobs(driver: webdriver.Chrome) -> list[JobOpening]:
-            job_opening_rows = driver.find_elements(
-                by=By.XPATH, value=r'//tr[@class="job-item"]'
-            )
-            print(f"Found {len(job_opening_rows)} job openings")
-
-            res = list[JobOpening]()
-            for ind, row in enumerate(job_opening_rows):
-                try:
-                    summary = row.find_elements(
-                        by=By.XPATH,
-                        value=r'.//td[@class="small-middle-view"]//td//font[@class="font2"]',
-                    )
-                    dates = row.find_elements(
-                        by=By.XPATH,
-                        value=r'.//td[@style="color:#336C99;"]',
-                    )
-                    if len(summary) != 3 or len(dates) != 2:
-                        raise ValueError(
-                            f"Expected 5 elements for each job opening. Got {len(summary) + len(dates)} instead at opening {ind + 1}."
-                        )
-                    posting_date, deadline = [
-                        datetime.strptime(
-                            str(ele.get_attribute("innerText")).strip(), r"%Y-%m-%d"
-                        )
-                        for ele in dates
-                    ]
-                    if deadline < datetime.now():
-                        print(
-                            f"Deadline {deadline} has passed for opening {ind + 1}. Skipping."
-                        )
-                        continue
-                    company, job_title, job_nature = [
-                        str(ele.get_attribute("innerText")).strip() for ele in summary
-                    ]
-                    job_opening = JobOpening(
-                        summary=JobSummary(
-                            company=company,
-                            job_title=job_title,
-                            job_nature=job_nature,
-                            posting_date=posting_date,
-                            deadline=deadline,
-                        )
-                    )
-                    res.append(job_opening)
-
-                except ValueError as e:
-                    print(e)
-                    continue
-            return res
-
         all_job_openings = list[JobOpening]()
         for page in range(pages):
             time.sleep(random.randrange(1, 3))
             print("Screening page ", page + 1)
             self.driver.get(base_url + f"&page={page + 1}")
-            all_job_openings.extend(get_single_page_jobs(self.driver))
+            all_job_openings.extend(self.single_page_parser.retrieve_job_openings())
         return all_job_openings
 
 
