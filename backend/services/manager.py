@@ -1,40 +1,24 @@
 import os
+from datetime import datetime
+import time
+import random
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
-from abc import ABC, abstractmethod
 from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.getcwd(), ".env"))
 
-
-class AutomationManager(ABC):
-    TIMEOUT = 5
-
-    def __init__(self, driver: webdriver.Chrome):
-        self.driver = driver
-        self.wait = WebDriverWait(self.driver, self.TIMEOUT)
-
-    @property
-    @abstractmethod
-    def job_board_url(self):
-        raise NotImplementedError
-
-    @abstractmethod
-    def execute(self):
-        self.driver.get(self.job_board_url)
-        print(f"Title: {self.driver.title}")
-
-    @abstractmethod
-    def get_job_listings(self):
-        raise NotImplementedError
+from interfaces.manager import AutomationManager
+from interfaces.job import JobOpening, JobSummary
 
 
 class JobBoardAutomationManager(AutomationManager):
     MSFT_LOGIN_TITLE = "Sign in to your account"
     DUO_TITLE = "Duo Security"
+    SORT_BY_DESC_DEADLINE = "&sort=deadline&order=desc"
 
     def __init__(self, driver: webdriver.Chrome, filter: str):
         super().__init__(driver)
@@ -44,7 +28,7 @@ class JobBoardAutomationManager(AutomationManager):
         self.filter = filter
 
     @property
-    def job_board_url(self):
+    def job_board_url(self) -> str:
         if not self._job_board_url:
             raise ValueError(
                 "Unable to retrieve url for job board. Please check environment variables."
@@ -52,7 +36,7 @@ class JobBoardAutomationManager(AutomationManager):
         return self._job_board_url
 
     @property
-    def email(self):
+    def email(self) -> str:
         if not self._email:
             raise ValueError(
                 "Unable to retrieve email. Please check environment variables."
@@ -60,18 +44,18 @@ class JobBoardAutomationManager(AutomationManager):
         return self._email
 
     @property
-    def password(self):
+    def password(self) -> str:
         if not self._password:
             raise ValueError(
                 "Unable to retrieve password. Please check environment variables."
             )
         return self._password
 
-    def execute(self):
+    def execute(self) -> list[JobOpening]:
         super().execute()
         if self.driver.title == self.MSFT_LOGIN_TITLE:
             self.handle_auth()
-        self.agree_terms().apply_filters().get_job_listings()
+        return self.agree_terms().apply_filters().get_job_listings()
 
     def handle_auth(self):
         # enter email and click next
@@ -145,5 +129,66 @@ class JobBoardAutomationManager(AutomationManager):
         print(f"Applied filters: {self.filter}")
         return self
 
-    def get_job_listings(self):
-        return self
+    def get_job_listings(self, pages=5) -> list[JobOpening]:
+        # set results with descending deadline, i.e furthest deadline goes first
+        base_url = self.driver.current_url + self.SORT_BY_DESC_DEADLINE
+        self.driver.get(base_url)
+
+        def get_single_page_jobs(driver: webdriver.Chrome) -> list[JobOpening]:
+            job_opening_rows = driver.find_elements(
+                by=By.XPATH, value=r'//tr[@class="job-item"]'
+            )
+            print(f"Found {len(job_opening_rows)} job openings")
+
+            res = list[JobOpening]()
+            for ind, row in enumerate(job_opening_rows):
+                try:
+                    summary = row.find_elements(
+                        by=By.XPATH,
+                        value=r'.//td[@class="small-middle-view"]//td//font[@class="font2"]',
+                    )
+                    dates = row.find_elements(
+                        by=By.XPATH,
+                        value=r'.//td[@style="color:#336C99;"]',
+                    )
+                    if len(summary) != 3 or len(dates) != 2:
+                        raise ValueError(
+                            f"Expected 5 elements for each job opening. Got {len(summary) + len(dates)} instead at opening {ind + 1}."
+                        )
+                    posting_date, deadline = [
+                        datetime.strptime(
+                            str(ele.get_attribute("innerText")).strip(), r"%Y-%m-%d"
+                        )
+                        for ele in dates
+                    ]
+                    if deadline < datetime.now():
+                        print(
+                            f"Deadline {deadline} has passed for opening {ind + 1}. Skipping."
+                        )
+                        continue
+                    company, job_title, job_nature = [
+                        str(ele.get_attribute("innerText")).strip() for ele in summary
+                    ]
+                    job_opening = JobOpening(
+                        summary=JobSummary(
+                            company=company,
+                            job_title=job_title,
+                            job_nature=job_nature,
+                            posting_date=posting_date,
+                            deadline=deadline,
+                        )
+                    )
+                    res.append(job_opening)
+
+                except ValueError as e:
+                    print(e)
+                    continue
+            return res
+
+        all_job_openings = list[JobOpening]()
+        for page in range(pages):
+            time.sleep(random.randrange(1, 3))
+            print("Screening page ", page + 1)
+            self.driver.get(base_url + f"&page={page + 1}")
+            all_job_openings.extend(get_single_page_jobs(self.driver))
+        return all_job_openings
