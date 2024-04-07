@@ -6,25 +6,31 @@ from selenium.webdriver.common.by import By
 
 
 class TermsAgreementHandler(ABC):
+    def __init__(self, wait: WebDriverWait) -> None:
+        self.wait = wait
+
     @abstractmethod
     def handle_terms_agreement(self, driver: webdriver.Chrome, wait: WebDriverWait):
         raise NotImplementedError
 
 
 class JobBoardTermsAgreementHandler(TermsAgreementHandler):
-    def handle_terms_agreement(self, wait: WebDriverWait):
+    def __init__(self, wait: WebDriverWait) -> None:
+        super().__init__(wait)
+
+    def handle_terms_agreement(self):
         # agree the declaration form
-        declaration_checkbox = wait.until(
+        declaration_checkbox = self.wait.until(
             EC.element_to_be_clickable((By.XPATH, r'//input[@type="checkbox"]'))
         )
         declaration_checkbox.click()
-        agree_btn = wait.until(
+        agree_btn = self.wait.until(
             EC.element_to_be_clickable((By.XPATH, r'//input[@value="Agree"]'))
         )
         agree_btn.click()
 
         # agree disclaimer
-        disclaimer_agree_btn = wait.until(
+        disclaimer_agree_btn = self.wait.until(
             EC.element_to_be_clickable((By.XPATH, r'//input[@type="submit"]'))
         )
         disclaimer_agree_btn.click()

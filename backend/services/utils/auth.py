@@ -10,13 +10,18 @@ load_dotenv()
 
 
 class AuthenticationHandler(ABC):
+    def __init__(self, driver: webdriver.Chrome, wait: WebDriverWait) -> None:
+        self.driver = driver
+        self.wait = wait
+
     @abstractmethod
     def handle_auth(self, driver: webdriver.Chrome, wait: WebDriverWait):
         raise NotImplementedError
 
 
 class JobBoardAuthenticationHandler(AuthenticationHandler):
-    def __init__(self) -> None:
+    def __init__(self, driver: webdriver.Chrome, wait: WebDriverWait) -> None:
+        super().__init__(driver, wait)
         self._email = os.getenv("EMAIL")
         self._password = os.getenv("PASSWORD")
 
@@ -36,25 +41,29 @@ class JobBoardAuthenticationHandler(AuthenticationHandler):
             )
         return self._password
 
-    def handle_auth(self, driver: webdriver.Chrome, wait: WebDriverWait):
+    def handle_auth(self):
         # enter email and click next
-        email_input = wait.until(EC.presence_of_element_located((By.NAME, "loginfmt")))
+        email_input = self.wait.until(
+            EC.presence_of_element_located((By.NAME, "loginfmt"))
+        )
         email_input.send_keys(self.email)
-        next_btn = wait.until(EC.element_to_be_clickable((By.ID, "idSIButton9")))
+        next_btn = self.wait.until(EC.element_to_be_clickable((By.ID, "idSIButton9")))
         next_btn.click()
 
         # enter password and click sign in
-        password_input = wait.until(EC.presence_of_element_located((By.ID, "i0118")))
+        password_input = self.wait.until(
+            EC.presence_of_element_located((By.ID, "i0118"))
+        )
         password_input.send_keys(self.password)
 
-        sign_in_btn = wait.until(
+        sign_in_btn = self.wait.until(
             EC.element_to_be_clickable((By.XPATH, r'//input[@type="submit"]'))
         )
         sign_in_btn.click()
 
         # Duo Mobile
         print("Waiting approval from mobile device...")
-        my_device_btn = WebDriverWait(driver, 60).until(
+        my_device_btn = WebDriverWait(self.driver, 60).until(
             EC.element_to_be_clickable((By.ID, "trust-browser-button"))
         )
         print("\u2713 Received approval from mobile device")
