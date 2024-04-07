@@ -1,5 +1,7 @@
 import os
 from datetime import datetime
+import time
+import random
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -16,6 +18,7 @@ from interfaces.job import JobOpening, JobSummary
 class JobBoardAutomationManager(AutomationManager):
     MSFT_LOGIN_TITLE = "Sign in to your account"
     DUO_TITLE = "Duo Security"
+    SORT_BY_DESC_DEADLINE = "&sort=deadline&order=desc"
 
     def __init__(self, driver: webdriver.Chrome, filter: str):
         super().__init__(driver)
@@ -127,6 +130,10 @@ class JobBoardAutomationManager(AutomationManager):
         return self
 
     def get_job_listings(self, pages=5) -> list[JobOpening]:
+        # set results with descending deadline, i.e furthest deadline goes first
+        base_url = self.driver.current_url + self.SORT_BY_DESC_DEADLINE
+        self.driver.get(base_url)
+
         def get_single_page_jobs(driver: webdriver.Chrome) -> list[JobOpening]:
             job_opening_rows = driver.find_elements(
                 by=By.XPATH, value=r'//tr[@class="job-item"]'
@@ -135,20 +142,32 @@ class JobBoardAutomationManager(AutomationManager):
 
             res = list[JobOpening]()
             for ind, row in enumerate(job_opening_rows):
-                summary = row.find_elements(
-                    by=By.XPATH,
-                    value=r'.//td[@class="small-middle-view"]//td//font[@class="font2"]',
-                )
-                dates = row.find_elements(
-                    by=By.XPATH,
-                    value=r'.//td[@style="color:#336C99;"]',
-                )
                 try:
+                    summary = row.find_elements(
+                        by=By.XPATH,
+                        value=r'.//td[@class="small-middle-view"]//td//font[@class="font2"]',
+                    )
+                    dates = row.find_elements(
+                        by=By.XPATH,
+                        value=r'.//td[@style="color:#336C99;"]',
+                    )
                     if len(summary) != 3 or len(dates) != 2:
-                        raise ValueError
-                    company, job_title, job_nature = [ele.text for ele in summary]
+                        raise ValueError(
+                            f"Expected 5 elements for each job opening. Got {len(summary) + len(dates)} instead at opening {ind + 1}."
+                        )
                     posting_date, deadline = [
-                        datetime.strptime(ele.text, r"%Y-%m-%d") for ele in dates
+                        datetime.strptime(
+                            str(ele.get_attribute("innerText")).strip(), r"%Y-%m-%d"
+                        )
+                        for ele in dates
+                    ]
+                    if deadline < datetime.now():
+                        print(
+                            f"Deadline {deadline} has passed for opening {ind + 1}. Skipping."
+                        )
+                        continue
+                    company, job_title, job_nature = [
+                        str(ele.get_attribute("innerText")).strip() for ele in summary
                     ]
                     job_opening = JobOpening(
                         summary=JobSummary(
@@ -162,11 +181,14 @@ class JobBoardAutomationManager(AutomationManager):
                     res.append(job_opening)
 
                 except ValueError as e:
-                    print(
-                        f"Expected 5 elements for each job opening. Got {len(summary) + len(dates)} instead at opening {ind + 1}."
-                    )
+                    print(e)
                     continue
             return res
 
-        all_job_openings = get_single_page_jobs(self.driver)
+        all_job_openings = list[JobOpening]()
+        for page in range(pages):
+            time.sleep(random.randrange(1, 3))
+            print("Screening page ", page + 1)
+            self.driver.get(base_url + f"&page={page + 1}")
+            all_job_openings.extend(get_single_page_jobs(self.driver))
         return all_job_openings
