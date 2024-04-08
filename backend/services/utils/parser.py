@@ -31,6 +31,7 @@ class JobBoardSinglePageParser(SinglePageParser):
         res = list[JobOpening]()
         for ind, row in enumerate(job_opening_rows):
             try:
+                # retrieve relevant elements
                 link_tag = row.find_element(
                     by=By.XPATH, value=r'.//a[@class="job-post"]'
                 )
@@ -46,6 +47,8 @@ class JobBoardSinglePageParser(SinglePageParser):
                     raise ValueError(
                         f"Expected 5 elements for each job opening. Got {len(summary) + len(dates)} instead at opening {ind + 1}."
                     )
+
+                # extract values from elements
                 posting_date, deadline = [
                     datetime.strptime(
                         str(ele.get_attribute("innerText")).strip(), r"%Y-%m-%d"
@@ -57,6 +60,7 @@ class JobBoardSinglePageParser(SinglePageParser):
                         f"Deadline {deadline} has passed for opening {ind + 1}. Skipping."
                     )
                     continue
+
                 details_href = link_tag.get_attribute("href")
                 if not details_href:
                     raise ValueError(
@@ -71,6 +75,8 @@ class JobBoardSinglePageParser(SinglePageParser):
                 company, job_title, job_nature = [
                     str(ele.get_attribute("innerText")).strip() for ele in summary
                 ]
+
+                # plug values into JobOpening
                 job_opening = JobOpening(
                     id=job_id,
                     summary=JobSummary(

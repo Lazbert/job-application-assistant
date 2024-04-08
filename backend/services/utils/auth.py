@@ -61,7 +61,7 @@ class JobBoardAuthenticationHandler(AuthenticationHandler):
         )
         sign_in_btn.click()
 
-        # Duo Mobile
+        # Mobile Authenticator
         print("Waiting approval from mobile device...")
         my_device_btn = WebDriverWait(self.driver, 60).until(
             EC.element_to_be_clickable((By.ID, "trust-browser-button"))
