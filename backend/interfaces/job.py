@@ -22,5 +22,6 @@ class JobDetails(BaseModel):
 
 
 class JobOpening(BaseModel):
+    id: str
     summary: JobSummary
     details: Optional[JobDetails] = None

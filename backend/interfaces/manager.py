@@ -10,6 +10,7 @@ class AutomationManager(ABC):
     def __init__(self, driver: webdriver.Chrome):
         self.driver = driver
         self.wait = WebDriverWait(self.driver, self.TIMEOUT)
+        self.job_openings = list[JobOpening]()
 
     @property
     @abstractmethod

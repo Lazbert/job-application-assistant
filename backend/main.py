@@ -11,12 +11,13 @@ def init_driver() -> webdriver.Chrome:
     return driver
 
 
-# %%
 manager = AutomationManagerFactory.create_manager(
     source=JobWebsite.JOB_BOARD, driver=init_driver(), filter="IT/"
 )
-all_openings = manager.execute()
-print(f"\u2713 Completed scraping {len(all_openings)} job openings.")
+manager.execute()
 
 # %%
-all_openings
+manager.get_job_listings()
+
+# %%
+manager.job_openings

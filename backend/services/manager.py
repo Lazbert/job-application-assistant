@@ -9,9 +9,11 @@ from selenium.webdriver.common.keys import Keys
 
 from interfaces.manager import AutomationManager
 from interfaces.job import JobOpening
+
 from services.utils.auth import JobBoardAuthenticationHandler
 from services.utils.terms import JobBoardTermsAgreementHandler
 from services.utils.parser import JobBoardSinglePageParser
+from services.utils.retriever import JobBoardSingleDetailsRetriever
 
 
 class JobBoardAutomationManager(AutomationManager):
@@ -28,6 +30,10 @@ class JobBoardAutomationManager(AutomationManager):
         self.terms_handler = JobBoardTermsAgreementHandler(wait=self.wait)
         self.single_page_parser = JobBoardSinglePageParser(driver=self.driver)
         self.filter = filter
+        self.job_openings = list[JobOpening]()
+        self.single_detail_retriever = JobBoardSingleDetailsRetriever(
+            driver=self.driver
+        )
 
     @property
     def job_board_url(self) -> str:
@@ -52,6 +58,7 @@ class JobBoardAutomationManager(AutomationManager):
         return self
 
     # TODO: Implement multi-filter
+    # TODO: separate this into another class
     def apply_filters(self):
         # select filter from dropdown
         job_nature_filter = self.wait.until(
@@ -76,7 +83,7 @@ class JobBoardAutomationManager(AutomationManager):
         print(f"Applied filters: {self.filter}")
         return self
 
-    def get_job_listings(self, pages=5) -> list[JobOpening]:
+    def get_job_listings(self, pages=3):
         # set results with descending deadline, i.e furthest deadline goes first
         base_url = self.driver.current_url + self.SORT_BY_DESC_DEADLINE
         self.driver.get(base_url)
@@ -86,7 +93,12 @@ class JobBoardAutomationManager(AutomationManager):
             print("Screening page ", page + 1)
             self.driver.get(base_url + f"&page={page + 1}")
             all_job_openings.extend(self.single_page_parser.retrieve_job_openings())
-        return all_job_openings
+        self.job_openings = all_job_openings
+        print(f"\u2713 Completed scraping {len(self.job_openings)} job openings.")
+        return self
+
+    def get_job_details(self):
+        pass
 
 
 class JobWebsite(Enum):

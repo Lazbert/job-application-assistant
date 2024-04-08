@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import re
 from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
@@ -30,6 +31,9 @@ class JobBoardSinglePageParser(SinglePageParser):
         res = list[JobOpening]()
         for ind, row in enumerate(job_opening_rows):
             try:
+                link_tag = row.find_element(
+                    by=By.XPATH, value=r'.//a[@class="job-post"]'
+                )
                 summary = row.find_elements(
                     by=By.XPATH,
                     value=r'.//td[@class="small-middle-view"]//td//font[@class="font2"]',
@@ -53,17 +57,29 @@ class JobBoardSinglePageParser(SinglePageParser):
                         f"Deadline {deadline} has passed for opening {ind + 1}. Skipping."
                     )
                     continue
+                details_href = link_tag.get_attribute("href")
+                if not details_href:
+                    raise ValueError(
+                        f"Unable to retrieve job id for opening {ind + 1}."
+                    )
+                match = re.search(r".*?jp=(\d*)", details_href)
+                if not match:
+                    raise ValueError(
+                        f"Unable to match regex pattern for opening {ind + 1}."
+                    )
+                job_id = match.group(1)
                 company, job_title, job_nature = [
                     str(ele.get_attribute("innerText")).strip() for ele in summary
                 ]
                 job_opening = JobOpening(
+                    id=job_id,
                     summary=JobSummary(
                         company=company,
                         job_title=job_title,
                         job_nature=job_nature,
                         posting_date=posting_date,
                         deadline=deadline,
-                    )
+                    ),
                 )
                 res.append(job_opening)
 
